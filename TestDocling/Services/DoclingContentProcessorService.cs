@@ -1,4 +1,4 @@
-﻿namespace TestDocling;
+﻿namespace TestDocling.Services;
 
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.TagHelpers.Cache;
@@ -10,7 +10,7 @@ using TestDocling;
 using TestDocling.Helpers;
 
 //gets json content from docling response and formats it into Dictionary of key: page# then value: text information
-public class PageContentBuilder
+public class DoclingContentProcessorService : IDoclingContentProcessorService
 {
     private class PageElementInfo
     {
@@ -20,6 +20,14 @@ public class PageContentBuilder
         public string ElementType { get; set; } //e.g. text, group, table, picture
         public string ElementId { get; set; }
     }
+    public async Task<Dictionary<int, string>> ProcessDoclingResponse(string doclingJsonOutput)
+    {
+        // Deserialize JSON string into DoclingResponse object
+        var doclingResult = JsonSerializer.Deserialize<DoclingResponse>(doclingJsonOutput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        //use method to build page-content
+        return BuildPageContent(doclingResult.Document);
+    }//end of ProcessDoclingResponse
     private Dictionary<int, string> BuildPageContent(Document doclingDocument)
     {
         var pageContent = new Dictionary<int, StringBuilder>();
@@ -172,6 +180,8 @@ public class PageContentBuilder
         return finalPageContents;
 
     }//end of BuildPageContent
+   
+    //helper to convert table data to string format
     private string ConvertTableToMarkdown(TableData tableData)
     {
         if (tableData?.TableCells == null || tableData.TableCells.Count == 0)
