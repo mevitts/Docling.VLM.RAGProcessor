@@ -1,0 +1,6 @@
+@TestDocling_HostAddress = http://localhost:5092
+
+GET {{TestDocling_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
