@@ -5,7 +5,6 @@ using System.Reflection.Metadata;
 using System.Text.Json.Serialization;
 
 namespace TestDocling;
-//ALERT NEED TO ADD TABLE HANDLING AND PICTURE INFO HERE
 public class DoclingResponse
 {
     [JsonPropertyName("document")]
@@ -37,16 +36,16 @@ public class JsonContent
     public DoclingBody Body { get; set; }
 
     [JsonPropertyName("groups")]
-    public List<GroupItem> Groups { get; set; }
+    public List<GroupItem>? Groups { get; set; }
 
     [JsonPropertyName("texts")]
-    public List<TextItem> Texts { get; set; }
+    public List<TextItem>? Texts { get; set; }
 
     [JsonPropertyName("tables")]
-    public List<TableItem> Tables { get; set; }
+    public List<TableItem>? Tables { get; set; }
 
     [JsonPropertyName("pictures")]
-    public List<PictureItem> Pictures { get; set; }
+    public List<PictureItem>? Pictures { get; set; }
 }
 public class DoclingBody
 {
@@ -54,19 +53,19 @@ public class DoclingBody
     public string SelfRef { get; set; }
 
     [JsonPropertyName("parent")]
-    public string Parent { get; set; }
+    public string? Parent { get; set; }
 
     [JsonPropertyName("children")]
-    public List<DoclingRef> Children { get; set; }
+    public List<DoclingRef>? Children { get; set; }
 
     [JsonPropertyName("content_layer")]
-    public string ContentLayer { get; set; }
+    public string? ContentLayer { get; set; }
 
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [JsonPropertyName("label")]
-    public string Label { get; set; }
+    public string? Label { get; set; }
 }
 public class GroupItem
 {
@@ -74,19 +73,19 @@ public class GroupItem
     public string SelfRef { get; set; }
 
     [JsonPropertyName("parent")]
-    public DoclingRef Parent { get; set; }
+    public DoclingRef? Parent { get; set; }
 
     [JsonPropertyName("children")]
-    public List<DoclingRef> Children { get; set; }
+    public List<DoclingRef>? Children { get; set; }
 
     [JsonPropertyName("content_layer")]
-    public string ContentLayer { get; set; }
+    public string? ContentLayer { get; set; }
 
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [JsonPropertyName("label")]
-    public string Label { get; set; }
+    public string? Label { get; set; }
 }
 public class TextItem
 {
@@ -94,31 +93,28 @@ public class TextItem
     public string SelfRef { get; set; }
 
     [JsonPropertyName("parent")]
-    public DoclingRef Parent { get; set; }
+    public DoclingRef? Parent { get; set; }
 
     [JsonPropertyName("children")]
-    public List<DoclingRef> Children { get; set; }
+    public List<DoclingRef>? Children { get; set; }
 
     [JsonPropertyName("content_layer")]
-    public string ContentLayer { get; set; }
+    public string? ContentLayer { get; set; }
 
     [JsonPropertyName("label")]
-    public string Label { get; set; }
+    public string? Label { get; set; }
 
     [JsonPropertyName("prov")]
-    public List<ProvItem> Prov { get; set; } = new List<ProvItem>();
+    public List<ProvItem>? Prov { get; set; } = new List<ProvItem>();
 
     [JsonPropertyName("orig")]
-    public string Orig { get; set; }
+    public string? Orig { get; set; }
 
     [JsonPropertyName("text")]
-    public string Text { get; set; }
-
-   /* [JsonPropertyName("formatting")]
-    public object Formatting { get; set; }*/
+    public string? Text { get; set; }
 
     [JsonPropertyName("hyperlink")]
-    public string Hyperlink { get; set; }
+    public string? Hyperlink { get; set; }
 
     [JsonPropertyName("level")]
     public int? Level { get; set; }
@@ -127,7 +123,7 @@ public class TextItem
     public bool? Enumerated { get; set; }
 
     [JsonPropertyName("marker")]
-    public string Marker { get; set; }
+    public string? Marker { get; set; }
 }
 public class ProvItem
 {
@@ -135,10 +131,10 @@ public class ProvItem
     public int? PageNo { get; set; }
 
     [JsonPropertyName("bbox")]
-    public BoundingBox Bbox { get; set; }
+    public BoundingBox? Bbox { get; set; }
 
     [JsonPropertyName("charspan")]
-    public List<int> Charspan { get; set; } = new List<int>();
+    public List<int>? Charspan { get; set; } = new List<int>();
 }
 public class TableItem
 {
@@ -146,22 +142,22 @@ public class TableItem
     public string SelfRef { get; set; }
 
     [JsonPropertyName("parent")]
-    public DoclingRef Parent { get; set; }
+    public DoclingRef? Parent { get; set; }
 
     [JsonPropertyName("children")]
-    public List<DoclingRef> Children { get; set; }
+    public List<DoclingRef>? Children { get; set; }
 
     [JsonPropertyName("content_layer")]
-    public string ContentLayer { get; set; }
+    public string? ContentLayer { get; set; }
 
     [JsonPropertyName("label")]
-    public string Label { get; set; }
+    public string? Label { get; set; }
 
     [JsonPropertyName("prov")]
-    public List<ProvItem> Prov { get; set; } = new List<ProvItem>();
+    public List<ProvItem>? Prov { get; set; } = new List<ProvItem>();
 
     [JsonPropertyName("data")]
-    public TableData Data { get; set; }
+    public TableData? Data { get; set; }
 }
 public class PictureItem
 {
@@ -169,144 +165,144 @@ public class PictureItem
     public string SelfRef { get; set; }
 
     [JsonPropertyName("parent")]
-    public DoclingRef Parent { get; set; }
+    public DoclingRef? Parent { get; set; }
 
     [JsonPropertyName("children")]
-    public List<DoclingRef> Children { get; set; }
+    public List<DoclingRef>? Children { get; set; }
 
     [JsonPropertyName("content_layer")]
-    public string ContentLayer { get; set; }
+    public string? ContentLayer { get; set; }
 
     [JsonPropertyName("label")]
-    public string Label { get; set; }
+    public string? Label { get; set; }
 
     [JsonPropertyName("prov")]
-    public List<ProvItem> Prov { get; set; } = new List<ProvItem>();
+    public List<ProvItem>? Prov { get; set; } = new List<ProvItem>();
 
     [JsonPropertyName("image")]
-    public ImageRef Image { get; set; }
+    public ImageRef? Image { get; set; }
 }
 
 //all for table item
 public class TableData
 {
     [JsonPropertyName("bbox")]
-    public BoundingBox Bbox { get; set; }
+    public BoundingBox? Bbox { get; set; }
 
     [JsonPropertyName("table_cells")]
-    public List<TableCell> TableCells { get; set; }
+    public List<TableCell>? TableCells { get; set; }
 
     [JsonPropertyName("num_rows")]
-    public int NumRows { get; set; }
+    public int? NumRows { get; set; }
 
     [JsonPropertyName("num_cols")]
-    public int NumCols { get; set; }
+    public int? NumCols { get; set; }
 
     [JsonPropertyName("grid")]
-    public List<List<GridItem>> Grid { get; set; } = new List<List<GridItem>>();
+    public List<List<GridItem>>? Grid { get; set; } = new List<List<GridItem>>();
 }
 public class TableCell
 {
     [JsonPropertyName("row_span")]
-    public int RowSpan { get; set; }
+    public int? RowSpan { get; set; }
 
     [JsonPropertyName("col_span")]
-    public int ColSpan { get; set; }
+    public int? ColSpan { get; set; }
 
     [JsonPropertyName("start_row_offset_idx")]
-    public int StartRowOffsetIDX { get; set; }
+    public int? StartRowOffsetIDX { get; set; }
 
     [JsonPropertyName("start_col_offset_idx")]
-    public int StartColOffsetIDX { get; set; }
+    public int? StartColOffsetIDX { get; set; }
 
     [JsonPropertyName("end_row_offset_idx")]
-    public int EndRowOffsetIDX { get; set; }
+    public int? EndRowOffsetIDX { get; set; }
 
     [JsonPropertyName("end_col_offset_idx")]
-    public int EndColOffsetIDX { get; set; }
+    public int? EndColOffsetIDX { get; set; }
 
     [JsonPropertyName("text")]
-    public string Text { get; set; }
+    public string? Text { get; set; }
 
     [JsonPropertyName("column_header")]
-    public bool ColumnHeader { get; set; }
+    public bool? ColumnHeader { get; set; }
 
     [JsonPropertyName("row_header")]
-    public bool RowHeader { get; set; }
+    public bool? RowHeader { get; set; }
 
     [JsonPropertyName("row_section")]
-    public bool RowSection { get; set; }
+    public bool? RowSection { get; set; }
 }
 public class GridItem
 {
     [JsonPropertyName("row_span")]
-    public int RowSpan { get; set; }
+    public int? RowSpan { get; set; }
 
     [JsonPropertyName("col_span")]
-    public int ColSpan { get; set; }
+    public int? ColSpan { get; set; }
 
     [JsonPropertyName("start_row_offset_idx")]
-    public int StartRowOffsetIDX { get; set; }
+    public int? StartRowOffsetIDX { get; set; }
 
     [JsonPropertyName("start_col_offset_idx")]
-    public int StartColOffsetIDX { get; set; }
+    public int? StartColOffsetIDX { get; set; }
 
     [JsonPropertyName("end_row_offset_idx")]
-    public int EndRowOffsetIDX { get; set; }
+    public int? EndRowOffsetIDX { get; set; }
 
     [JsonPropertyName("end_col_offset_idx")]
-    public int EndColOffsetIDX { get; set; }
+    public int? EndColOffsetIDX { get; set; }
 
     [JsonPropertyName("text")]
-    public string Text { get; set; }
+    public string? Text { get; set; }
 
     [JsonPropertyName("column_header")]
-    public bool ColumnHeader { get; set; }
+    public bool? ColumnHeader { get; set; }
 
     [JsonPropertyName("row_header")]
-    public bool RowHeader { get; set; }
+    public bool? RowHeader { get; set; }
 
     [JsonPropertyName("row_section")]
-    public bool RowSection { get; set; }
+    public bool? RowSection { get; set; }
 }
 //prov
 public class BoundingBox
 {
     [JsonPropertyName("l")]
-    public double L { get; set; }
+    public double? L { get; set; }
     [JsonPropertyName("t")]
-    public double T { get; set; }
+    public double? T { get; set; }
     [JsonPropertyName("r")]
-    public double R { get; set; }
+    public double? R { get; set; }
     [JsonPropertyName("b")]
-    public double B { get; set; }
+    public double? B { get; set; }
     [JsonPropertyName("coord_origin")]
-    public string CoordOrigin { get; set; }
+    public string? CoordOrigin { get; set; }
 }
 
 //$ref
 public class DoclingRef
 {
     [JsonPropertyName("$ref")]
-    public string Ref { get; set; }
+    public string? Ref { get; set; }
 }
 
 //page no and image
 public class PageDetail
 {
     [JsonPropertyName("page_no")]
-    public int PageNo { get; set; }
+    public int? PageNo { get; set; }
 
     [JsonPropertyName("image")]
-    public ImageRef Image { get; set; }
+    public ImageRef? Image { get; set; }
 }
 
 //img uri
 public class ImageRef
 {
     [JsonPropertyName("uri")]
-    public string Uri { get; set; }
+    public string? Uri { get; set; }
 
     [JsonPropertyName("mimetype")]
-    public string MimeType { get; set; }
+    public string? MimeType { get; set; }
 }

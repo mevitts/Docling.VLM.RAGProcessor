@@ -25,18 +25,7 @@ namespace TestDocling
                     fileContents.Add("filename", doclingResponse.Document.Filename);
 
                     fileContents.Add("md_content", doclingResponse.Document.MdContent);
-
-                    // serialize Json Content so can extract page content
-                    /*string json_content = JsonSerializer.Serialize(doclingResponse.Document.DoclingJsonContent, new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        PropertyNameCaseInsensitive = true
-                    });*/
-
-                    var built_content = PageContentBuilder(doclingResponse.Document);
-
-
-                    fileContents.Add("json_content", json_content);
+                    
                 }
                 else
                 {

@@ -12,6 +12,17 @@ using TestDocling.Helpers;
 //gets json content from docling response and formats it into Dictionary of key: page# then value: text information
 public class DoclingContentProcessorService : IDoclingContentProcessorService
 {
+    private readonly HttpClient _ollamaHttpClient;
+    private readonly ILogger<DoclingContentProcessorService> _logger;
+
+    public DoclingContentProcessorService(IHttpClientFactory httpClientFactory, ILogger<DoclingContentProcessorService> logger)
+    {
+        // Get the named HttpClient instance configured in Program.cs
+        _ollamaHttpClient = httpClientFactory.CreateClient("OllamaClient");
+        _logger = logger;
+        _logger.LogInformation("DoclingContentProcessorService instantiated with VLM capability.");
+    }//constructor to accept IHttpClientFactory and ILogger so can use them to make HTTP requests to Ollama and log information
+
     private class PageElementInfo
     {
         public int? PageNo { get; set; }
@@ -27,9 +38,11 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
 
         //use method to build page-content
         return BuildPageContent(doclingResult.Document);
+
     }//end of ProcessDoclingResponse
     private Dictionary<int, string> BuildPageContent(Document doclingDocument)
     {
+        var fileType = Path.GetExtension(doclingDocument.Filename);
         var pageContent = new Dictionary<int, StringBuilder>();
         //for $ref pointers, dictionary that have its key as the $ref value and its value as the object it points to
         var elementLookup = new Dictionary<string, object>();
@@ -156,13 +169,21 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
 
         List<int> sortedPageNumbers = new List<int>(temporaryPages.Keys);//sort by pages
         sortedPageNumbers.Sort();
-
         foreach (int pageNumber in sortedPageNumbers)
         {
             var pageTextBuilder = new StringBuilder();
             List<PageElementInfo> pageElements = temporaryPages[pageNumber];
+            
+            if (fileType == ".pptx")
+            {
+                pageElements.Sort((e1, e2) => e1.Top.CompareTo(e2.Top));
+            }//for pptx the way the origin is set, the bounding box "top" element is reversed, so lower elements have a higher top value
+            else 
+            {
+                pageElements.Sort((e1, e2) => -e1.Top.CompareTo(e2.Top));  
+            }//for pdfs: sort by top coord, uses lambda, to have page structure. - sign to reverse order, as sorts from lowest "top" to highest
+           
 
-            pageElements.Sort((e1, e2) => e1.Top.CompareTo(e2.Top)); //sort by top coord, uses lambda, to have page structure
 
             foreach (var element in pageElements)
             {
@@ -174,15 +195,16 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         Dictionary<int, string> finalPageContents = new Dictionary<int, string>();
         foreach (var page in pageContent)
         {
-            finalPageContents[page.Key] = page.Value.ToString();
+            finalPageContents[page.Key] = ContentFormatter.ConvertEscapes(page.Value.ToString());
         }//convert StringBUilder from each page to actual string
+
 
         return finalPageContents;
 
     }//end of BuildPageContent
    
     //helper to convert table data to string format
-    private string ConvertTableToMarkdown(TableData tableData)
+    private string ConvertTable(TableData tableData)
     {
         if (tableData?.TableCells == null || tableData.TableCells.Count == 0)
         {
