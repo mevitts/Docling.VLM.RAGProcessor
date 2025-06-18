@@ -20,6 +20,9 @@ builder.Services.AddHttpClient("OllamaClient", client =>
 //register DoclingContentProcessorService interface and implementation, new instance created per HTTP request.
 builder.Services.AddScoped<IDoclingContentProcessorService, DoclingContentProcessorService>();
 
+//register Ollama Service implementation
+builder.Services.AddScoped<IVlmService, OllamaSharpVlmService>(); 
+
 
 builder.Services.AddControllers();
 

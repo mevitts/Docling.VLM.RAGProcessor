@@ -2,27 +2,28 @@
 
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.TagHelpers.Cache;
+using OllamaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using TestDocling;
 using TestDocling.Helpers;
 
 //gets json content from docling response and formats it into Dictionary of key: page# then value: text information
 public class DoclingContentProcessorService : IDoclingContentProcessorService
 {
-    private readonly HttpClient _ollamaHttpClient;
     private readonly ILogger<DoclingContentProcessorService> _logger;
+    private readonly IVlmService _vlmService;
 
-    public DoclingContentProcessorService(IHttpClientFactory httpClientFactory, ILogger<DoclingContentProcessorService> logger)
+    public DoclingContentProcessorService(IHttpClientFactory httpClientFactory, ILogger<DoclingContentProcessorService> logger, IVlmService vlmService)
     {
-        // Get the named HttpClient instance configured in Program.cs
-        _ollamaHttpClient = httpClientFactory.CreateClient("OllamaClient");
         _logger = logger;
-        _logger.LogInformation("DoclingContentProcessorService instantiated with VLM capability.");
-    }//constructor to accept IHttpClientFactory and ILogger so can use them to make HTTP requests to Ollama and log information
-
+        _vlmService = vlmService;
+    }
     private class PageElementInfo
     {
         public int? PageNo { get; set; }
@@ -37,10 +38,10 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         var doclingResult = JsonSerializer.Deserialize<DoclingResponse>(doclingJsonOutput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         //use method to build page-content
-        return BuildPageContent(doclingResult.Document);
+        return await BuildPageContent(doclingResult.Document);
 
     }//end of ProcessDoclingResponse
-    private Dictionary<int, string> BuildPageContent(Document doclingDocument)
+    private async Task<Dictionary<int, string>> BuildPageContent(Document doclingDocument)
     {
         var fileType = Path.GetExtension(doclingDocument.Filename);
         var pageContent = new Dictionary<int, StringBuilder>();
@@ -83,11 +84,9 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         //page info has #, top of element, content, and type (text, table, etc.)
         var allPageElements = new List<PageElementInfo>();
 
-        //take current allPageElements, and temporarily aggregate all elements into dictionary with page numbers
-        Dictionary<int, List<PageElementInfo>> temporaryPages = new Dictionary<int, List<PageElementInfo>>();
-
+       
         //recursive function to traverse all elements and convert them to a page element then add to temporary page dictionary
-        void TraverseAndCollect(List<DoclingRef> childrenRefs)
+        async Task TraverseAndCollect(List<DoclingRef> childrenRefs)
         {
             if (childrenRefs == null) return;
 
@@ -128,18 +127,20 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
                     {
                         if (pictureItem.Prov != null && pictureItem.Prov.Any())
                         {
+                            string imageDescription = await _vlmService.DescribeImageAsync(pictureItem.Image.Uri, "Describe the provided image in a clear and concise manner.");
+                            _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pictureItem.Prov.FirstOrDefault().PageNo, imageDescription);
                             allPageElements.Add(new PageElementInfo
                             {
                                 PageNo = pictureItem.Prov.FirstOrDefault().PageNo,
                                 Top = pictureItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
-                                Content = "[Image Content]",
+                                Content = $"Image Description: {imageDescription}",
                                 ElementType = pictureItem.Label
                             });
                         }
                     }//for PictureItem
                     else if (element is GroupItem groupItem)
                     {
-                        TraverseAndCollect(groupItem.Children);
+                        await TraverseAndCollect(groupItem.Children);
                     }//traverse if Groupitem
                 }//take element and fill get its page info
             }//traverse through all children
@@ -147,8 +148,11 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
 
         if (json_content.Body?.Children != null)
         {
-            TraverseAndCollect(json_content.Body.Children);
+            await TraverseAndCollect(json_content.Body.Children);
         }//call TraverseAndCollect to start
+
+         //take current allPageElements, and temporarily aggregate all elements into dictionary with page numbers
+         Dictionary<int, List<PageElementInfo>> temporaryPages = new Dictionary<int, List<PageElementInfo>>();
 
         foreach (var item in allPageElements)
         {
@@ -173,16 +177,16 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         {
             var pageTextBuilder = new StringBuilder();
             List<PageElementInfo> pageElements = temporaryPages[pageNumber];
-            
+
             if (fileType == ".pptx")
             {
                 pageElements.Sort((e1, e2) => e1.Top.CompareTo(e2.Top));
             }//for pptx the way the origin is set, the bounding box "top" element is reversed, so lower elements have a higher top value
-            else 
+            else
             {
-                pageElements.Sort((e1, e2) => -e1.Top.CompareTo(e2.Top));  
+                pageElements.Sort((e1, e2) => -e1.Top.CompareTo(e2.Top));
             }//for pdfs: sort by top coord, uses lambda, to have page structure. - sign to reverse order, as sorts from lowest "top" to highest
-           
+
 
 
             foreach (var element in pageElements)
@@ -199,10 +203,12 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         }//convert StringBUilder from each page to actual string
 
 
+        _logger.LogInformation("Finished generating");
+
         return finalPageContents;
 
     }//end of BuildPageContent
-   
+
     //helper to convert table data to string format
     private string ConvertTable(TableData tableData)
     {
