@@ -33,15 +33,6 @@ public class OllamaSharpVlmService : IVlmService
             uri = uri.Replace("data:image/png;base64,", ""); // Remove base64 prefix if exists
             string image_url = $"data:image/png;base64,{uri}"; // Convert uri to base64 image format for VLM
             _logger.LogInformation("Describing image with Ollama API: {ImageUrl}", image_url.Substring(0, 50));
-            var messages = new List<Message>
-                {
-                    new Message
-                    {
-                        Role = ChatRole.User,
-                        Content = prompt,
-                        Images = new string[] {uri} // Add the base64 image string to the message 
-                    }
-                };
 
 
             // Fix: Use SendAsAsync instead of StreamAsync as per the provided type signatures

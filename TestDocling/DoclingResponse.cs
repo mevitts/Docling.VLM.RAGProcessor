@@ -44,7 +44,7 @@ public class JsonContent
     [JsonPropertyName("tables")]
     public List<TableItem>? Tables { get; set; }
 
-    [JsonPropertyName("pictures")]
+    [JsonPropertyName("pictures")] 
     public List<PictureItem>? Pictures { get; set; }
 }
 public class DoclingBody

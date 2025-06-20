@@ -1,7 +1,9 @@
 ﻿namespace TestDocling.Services;
 
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.TagHelpers.Cache;
+using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using OllamaSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -9,9 +11,11 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TestDocling;
 using TestDocling.Helpers;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 //gets json content from docling response and formats it into Dictionary of key: page# then value: text information
 public class DoclingContentProcessorService : IDoclingContentProcessorService
@@ -49,6 +53,7 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         var elementLookup = new Dictionary<string, object>();
 
         JsonContent json_content = doclingDocument.DoclingJsonContent;
+        string md_content = doclingDocument.MdContent;
 
         //fills out elementLookup with all elements in the returned json content with their selfref
         if (json_content.Texts != null)
@@ -80,11 +85,14 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
             }
         }
 
+
+
+
         //collect all content in order with page and position
         //page info has #, top of element, content, and type (text, table, etc.)
         var allPageElements = new List<PageElementInfo>();
 
-       
+
         //recursive function to traverse all elements and convert them to a page element then add to temporary page dictionary
         async Task TraverseAndCollect(List<DoclingRef> childrenRefs)
         {
@@ -108,7 +116,7 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
                                 ElementType = textItem.Label
                             });
                         }
-                    }//for TextItem
+                    }//for TableItem
                     else if (element is TableItem tableItem)
                     {
                         if (tableItem.Prov != null && tableItem.Prov.Any())
@@ -122,13 +130,17 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
                                 ElementType = tableItem.Label
                             });
                         }
-                    }//for TableItem
-                    else if (element is PictureItem pictureItem)
+                    }//for PictureItem
+                    else if (element is PictureItem pictureItem && fileType != ".pdf")
                     {
                         if (pictureItem.Prov != null && pictureItem.Prov.Any())
                         {
-                            string imageDescription = await _vlmService.DescribeImageAsync(pictureItem.Image.Uri, "Describe the provided image in a clear and concise manner.");
-                            _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pictureItem.Prov.FirstOrDefault().PageNo, imageDescription);
+                            string imageDescription = "No description available";
+                            if (pictureItem.Image.Uri != null)
+                            {
+                                imageDescription = await _vlmService.DescribeImageAsync(pictureItem.Image.Uri, "Describe the provided image in a clear and concise manner. Do not go off on a tangent for every detail spotted, just provide the main idea of the image. Limit to 1 sentence.");
+                                _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pictureItem.Prov.FirstOrDefault().PageNo, imageDescription);
+                            }
                             allPageElements.Add(new PageElementInfo
                             {
                                 PageNo = pictureItem.Prov.FirstOrDefault().PageNo,
@@ -138,12 +150,15 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
                             });
                         }
                     }//for PictureItem
+
                     else if (element is GroupItem groupItem)
                     {
                         await TraverseAndCollect(groupItem.Children);
                     }//traverse if Groupitem
                 }//take element and fill get its page info
             }//traverse through all children
+
+
         }//define recursive Traverse function
 
         if (json_content.Body?.Children != null)
@@ -151,8 +166,51 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
             await TraverseAndCollect(json_content.Body.Children);
         }//call TraverseAndCollect to start
 
-         //take current allPageElements, and temporarily aggregate all elements into dictionary with page numbers
-         Dictionary<int, List<PageElementInfo>> temporaryPages = new Dictionary<int, List<PageElementInfo>>();
+
+        if (fileType == ".pdf" && md_content != null)
+        {
+            //regex to find image URIs in the markdown content
+            var reg = new Regex(@"(?<=\[Image\]\().*?(?=\))");
+            //splits md content by page
+            string[] splits = md_content.Split(new string[] { "[PAGE BREAK]" }, StringSplitOptions.None);
+
+            int pageNo = 0;
+            foreach (var page in splits)
+            {
+                pageNo += 1;
+                var matches = reg.Matches(page);
+                if (matches.Count > 0)
+                {
+                    foreach (Match match in matches)
+                    {
+                        var imageUri = match.Value;
+                        var imageDescription = "No description available";
+                        if (imageUri != null)
+                        {
+                            imageDescription = await _vlmService.DescribeImageAsync(imageUri, "Describe the provided image in a clear and concise manner. Do not go off on a tangent for every detail spotted, just provide the main idea of the image. Limit to 1 sentence.");
+
+                            _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pageNo, imageDescription); //page.PageNo, imageDescription);
+                        }//get image description for each page in PDF, as it is stored in the page details
+
+                        allPageElements.Add(new PageElementInfo
+                        {
+                            PageNo = pageNo,
+                            Top = 0, //top is not used for PDF pages, so set to 0
+                            Content = $"Image on page {pageNo}: {imageDescription}",
+                            ElementType = "Page Image"
+                        });//add page info to allPageElements
+
+                    }//collect image details for each page in PDF
+
+                }//makes sure image uris are not null
+
+            }//goes through each page element (string), finds regex matches to get image uris, then adds to pageElement dictionary
+
+        }//collect image information through markdown content, as json returns uris of the full page sometimes, leading to inaccurate image description
+
+
+        //take current allPageElements, and temporarily aggregate all elements into dictionary with page numbers
+        Dictionary<int, List<PageElementInfo>> temporaryPages = new Dictionary<int, List<PageElementInfo>>();
 
         foreach (var item in allPageElements)
         {

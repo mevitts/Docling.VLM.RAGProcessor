@@ -66,8 +66,9 @@ namespace TestDocling.Controllers
             var jsonString = await response.Content.ReadAsStringAsync();
 
             var pageContent = await _contentProcessorService.ProcessDoclingResponse(jsonString);
+            return Ok(pageContent);
 
-            return Ok(pageContent);         
+            //return Ok(jsonString); //return raw JSON response from Docling-serve
         }
     }
 }
