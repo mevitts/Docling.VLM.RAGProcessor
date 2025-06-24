@@ -1,8 +1,9 @@
 ﻿namespace TestDocling.Services;
+using static TestDocling.Services.DoclingContentProcessorService;
 
 public interface IDoclingContentProcessorService
 {
     //process JSON string from Docling-serve, creates final page contents
-    Task<Dictionary<int, string>> ProcessDoclingResponse(string doclingJsonOutput);
+    Task<Dictionary<int, PageOutput>> ProcessDoclingResponse(string doclingJsonOutput);
 }
 
