@@ -17,7 +17,6 @@ public class OllamaSharpVlmService : IVlmService
     public OllamaSharpVlmService(IHttpClientFactory httpClientFactory, ILogger<OllamaSharpVlmService> logger)
     {
         var httpClient = httpClientFactory.CreateClient("OllamaClient");
-        httpClient.Timeout = TimeSpan.FromMinutes(5);
         _ollamaApiClient = new OllamaApiClient(httpClient);
         _ollamaApiClient.SelectedModel = "llava:7b";
         _logger = logger;
@@ -30,12 +29,11 @@ public class OllamaSharpVlmService : IVlmService
 
         try
         {
-            uri = uri.Replace("data:image/png;base64,", ""); // Remove base64 prefix if exists
-            string image_url = $"data:image/png;base64,{uri}"; // Convert uri to base64 image format for VLM
+            uri = uri.Replace("data:image/png;base64,", ""); //remove base64 prefix if exists
+            string image_url = $"data:image/png;base64,{uri}"; //convert uri to base64 image format for VLM
             _logger.LogInformation("Describing image with Ollama API: {ImageUrl}", image_url.Substring(0, 50));
 
 
-            // Fix: Use SendAsAsync instead of StreamAsync as per the provided type signatures
             var responseBuilder = new StringBuilder();
             await foreach (var responsePart in chat.SendAsAsync(ChatRole.User, prompt, null, new List<string> { uri }, null))
             {

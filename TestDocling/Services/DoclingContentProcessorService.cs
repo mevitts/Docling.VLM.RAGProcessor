@@ -11,11 +11,13 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TestDocling;
 using TestDocling.Helpers;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using static TestDocling.Services.DoclingContentProcessorService;
 
 //gets json content from docling response and formats it into Dictionary of key: page# then value: text information
 public class DoclingContentProcessorService : IDoclingContentProcessorService
@@ -36,7 +38,27 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         public string ElementType { get; set; } //e.g. text, group, table, picture
         public string ElementId { get; set; }
     }
-    public async Task<Dictionary<int, string>> ProcessDoclingResponse(string doclingJsonOutput)
+    public class PageOutput
+    {
+        public string Text { get; set; } = string.Empty;
+        public List<ImageOutput> Images { get; set; } = new List<ImageOutput>();
+    }
+    public class ImageOutput
+    {
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; }
+    }
+    private class ImageJob
+    {
+        public int PageNo { get; set; }
+        public string Uri { get; set; }
+        public string Label { get; set; }
+    }//helper to process images HELPER
+
+    public async Task<Dictionary<int, PageOutput>> ProcessDoclingResponse(string doclingJsonOutput)
     {
         // Deserialize JSON string into DoclingResponse object
         var doclingResult = JsonSerializer.Deserialize<DoclingResponse>(doclingJsonOutput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -45,227 +67,278 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         return await BuildPageContent(doclingResult.Document);
 
     }//end of ProcessDoclingResponse
-    private async Task<Dictionary<int, string>> BuildPageContent(Document doclingDocument)
+    private async Task<Dictionary<int, PageOutput>> BuildPageContent(Document doclingDocument)
     {
         var fileType = Path.GetExtension(doclingDocument.Filename);
         var pageContent = new Dictionary<int, StringBuilder>();
-        //for $ref pointers, dictionary that have its key as the $ref value and its value as the object it points to
-        var elementLookup = new Dictionary<string, object>();
-
         JsonContent json_content = doclingDocument.DoclingJsonContent;
         string md_content = doclingDocument.MdContent;
 
-        //fills out elementLookup with all elements in the returned json content with their selfref
+        //page info has #, top of element, content, and type (text, table, etc.)
+        var allPageElements = new List<PageElementInfo>();
+        //for $ref pointers, dictionary that have its key as the $ref value and its value as the object it points to
+        var elementLookup = new Dictionary<string, object>();
+        //for images, a list of image jobs to process later
+        var imageJobs = new List<ImageJob>();
+
+        // --- Simple and Clear Element Lookup Population ---
         if (json_content.Texts != null)
         {
-            foreach (TextItem textItem in json_content.Texts)
+            foreach (var item in json_content.Texts)
             {
-                elementLookup[textItem.SelfRef] = textItem;
+                elementLookup[item.SelfRef] = item;
             }
         }
         if (json_content.Groups != null)
         {
-            foreach (var groupItem in json_content.Groups)
+            foreach (var item in json_content.Groups)
             {
-                elementLookup[groupItem.SelfRef] = groupItem;
+                elementLookup[item.SelfRef] = item;
             }
         }
         if (json_content.Tables != null)
         {
-            foreach (var tableItem in json_content.Tables)
+            foreach (var item in json_content.Tables)
             {
-                elementLookup[tableItem.SelfRef] = tableItem;
+                elementLookup[item.SelfRef] = item;
             }
         }
         if (json_content.Pictures != null)
         {
-            foreach (var pictureItem in json_content.Pictures)
+            foreach (var item in json_content.Pictures)
             {
-                elementLookup[pictureItem.SelfRef] = pictureItem;
+                elementLookup[item.SelfRef] = item;
             }
         }
 
-
-
-
-        //collect all content in order with page and position
-        //page info has #, top of element, content, and type (text, table, etc.)
-        var allPageElements = new List<PageElementInfo>();
-
-
-        //recursive function to traverse all elements and convert them to a page element then add to temporary page dictionary
-        async Task TraverseAndCollect(List<DoclingRef> childrenRefs)
+        //collects info from all children 
+        void TraverseAndCollect(List<DoclingRef> childrenRefs)
         {
             if (childrenRefs == null) return;
 
             foreach (var childrenRef in childrenRefs)
             {
-                // looks up the element by its selfref in the elementLookup dictionary
                 if (elementLookup.TryGetValue(childrenRef.Ref, out object element))
                 {
                     //depending on element, fills out page info
-                    if (element is TextItem textItem)
+                    if (element is TextItem textItem && textItem.Prov != null && textItem.Prov.Any())
                     {
-                        if (textItem.Prov != null && textItem.Prov.Any())
+                        allPageElements.Add(new PageElementInfo
                         {
-                            allPageElements.Add(new PageElementInfo
-                            {
-                                PageNo = textItem.Prov.FirstOrDefault().PageNo,
-                                Top = textItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
-                                Content = ContentFormatter.ConvertEscapes(textItem.Text),
-                                ElementType = textItem.Label
-                            });
-                        }
-                    }//for TableItem
-                    else if (element is TableItem tableItem)
+                            PageNo = textItem.Prov.FirstOrDefault().PageNo,
+                            Top = textItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
+                            Content = ContentFormatter.ConvertEscapes(textItem.Text),
+                        });
+
+                    }//for textitem
+
+                    else if (element is TableItem tableItem && tableItem.Prov != null && tableItem.Prov.Any())
                     {
-                        if (tableItem.Prov != null && tableItem.Prov.Any())
+                        allPageElements.Add(new PageElementInfo
                         {
-                            string tableText = ContentFormatter.ConvertEscapes(ConvertTable(tableItem.Data)); //get rid of escapes and normalize text
-                            allPageElements.Add(new PageElementInfo
-                            {
-                                PageNo = tableItem.Prov.FirstOrDefault().PageNo,
-                                Top = tableItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
-                                Content = tableText,
-                                ElementType = tableItem.Label
-                            });
-                        }
-                    }//for PictureItem
-                    else if (element is PictureItem pictureItem && fileType != ".pdf")
+                            PageNo = tableItem.Prov.FirstOrDefault().PageNo,
+                            Top = tableItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
+                            Content = ContentFormatter.ConvertEscapes(ConvertTable(tableItem.Data))
+                        });
+                    }//for tableitem
+
+                    else if (element is PictureItem pictureItem && fileType != ".pdf" && pictureItem.Prov != null && pictureItem.Prov.Any())
                     {
-                        if (pictureItem.Prov != null && pictureItem.Prov.Any())
+                        if (pictureItem.Image?.Uri != null)
                         {
-                            string imageDescription = "No description available";
-                            if (pictureItem.Image.Uri != null)
+                            imageJobs.Add(new ImageJob
                             {
-                                imageDescription = await _vlmService.DescribeImageAsync(pictureItem.Image.Uri, "Describe the provided image in a clear and concise manner. Do not go off on a tangent for every detail spotted, just provide the main idea of the image. Limit to 1 sentence.");
-                                _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pictureItem.Prov.FirstOrDefault().PageNo, imageDescription);
-                            }
-                            allPageElements.Add(new PageElementInfo
-                            {
-                                PageNo = pictureItem.Prov.FirstOrDefault().PageNo,
-                                Top = pictureItem.Prov.FirstOrDefault().Bbox?.T ?? 0,
-                                Content = $"Image Description: {imageDescription}",
-                                ElementType = pictureItem.Label
+                                PageNo = (int)pictureItem.Prov.First().PageNo,
+                                Uri = pictureItem.Image.Uri,
+                                Label = pictureItem.Label ?? "Image"
                             });
-                        }
-                    }//for PictureItem
+                        }//add image job to list for later processing
+                    }//for pictureitem
 
                     else if (element is GroupItem groupItem)
                     {
-                        await TraverseAndCollect(groupItem.Children);
+                        TraverseAndCollect(groupItem.Children);
                     }//traverse if Groupitem
-                }//take element and fill get its page info
-            }//traverse through all children
 
+                }//gets child element
 
-        }//define recursive Traverse function
+            } //traverse through all children
+
+        }//end of TraverseAndCollect
 
         if (json_content.Body?.Children != null)
         {
-            await TraverseAndCollect(json_content.Body.Children);
+            TraverseAndCollect(json_content.Body.Children);
         }//call TraverseAndCollect to start
-
 
         if (fileType == ".pdf" && md_content != null)
         {
             //regex to find image URIs in the markdown content
-            var reg = new Regex(@"(?<=\[Image\]\().*?(?=\))");
+            //now splits into groups to capture the URI correctly
+            var reg = new Regex(@"(?<=\!\[(.*?)\]\().*?(?=\))");
             //splits md content by page
             string[] splits = md_content.Split(new string[] { "[PAGE BREAK]" }, StringSplitOptions.None);
 
             int pageNo = 0;
             foreach (var page in splits)
             {
-                pageNo += 1;
-                var matches = reg.Matches(page);
-                if (matches.Count > 0)
+                pageNo++;
+                foreach (Match match in reg.Matches(page))
                 {
-                    foreach (Match match in matches)
+                    imageJobs.Add(new ImageJob
                     {
-                        var imageUri = match.Value;
-                        var imageDescription = "No description available";
-                        if (imageUri != null)
-                        {
-                            imageDescription = await _vlmService.DescribeImageAsync(imageUri, "Describe the provided image in a clear and concise manner. Do not go off on a tangent for every detail spotted, just provide the main idea of the image. Limit to 1 sentence.");
+                        PageNo = pageNo,
+                        Uri = match.Value, //uri placed in group 1
+                        Label = "Image"
+                    });
+                }
 
-                            _logger.LogInformation("Full image description received for page {PageNo}: {Description}", pageNo, imageDescription); //page.PageNo, imageDescription);
-                        }//get image description for each page in PDF, as it is stored in the page details
-
-                        allPageElements.Add(new PageElementInfo
-                        {
-                            PageNo = pageNo,
-                            Top = 0, //top is not used for PDF pages, so set to 0
-                            Content = $"Image on page {pageNo}: {imageDescription}",
-                            ElementType = "Page Image"
-                        });//add page info to allPageElements
-
-                    }//collect image details for each page in PDF
-
-                }//makes sure image uris are not null
-
-            }//goes through each page element (string), finds regex matches to get image uris, then adds to pageElement dictionary
+            }//goes through each page element (string), finds regex matches to get image uris, then adds as image job
 
         }//collect image information through markdown content, as json returns uris of the full page sometimes, leading to inaccurate image description
 
-
-        //take current allPageElements, and temporarily aggregate all elements into dictionary with page numbers
-        Dictionary<int, List<PageElementInfo>> temporaryPages = new Dictionary<int, List<PageElementInfo>>();
-
-        foreach (var item in allPageElements)
+        //process all images in parallel
+        var processedImages = new List<(int PageNo, ImageOutput Output)>();
+        var imageTasks = imageJobs.Select(async job =>
         {
-            int pageNumber = (int)item.PageNo;
-
-            if (temporaryPages.ContainsKey(pageNumber))
+            const int maxTries = 3;
+            for (int i = 0; i < maxTries; i++)
             {
-                temporaryPages[pageNumber].Add(item);
-            }//if page number list already exists
-            else
-            {
-                List<PageElementInfo> newPageList = new List<PageElementInfo>();
-                newPageList.Add(item);
-                temporaryPages.Add(pageNumber, newPageList);
-            }//create new list for specific page number if doesn't exist
+                _logger.LogInformation("Try {count}", i);
+                string descriptionJson = "";
+                try
+                {
+                    string prompt = @"You are an automated image analysis tool. Your SOLE function is to return a single, valid JSON object.
+Do NOT include any explanatory text, apologies, or any characters before or after the JSON object.
+Do NOT use markdown code blocks like ```json.
 
-        }//add to temporaryPages to group elements by page
+Respond ONLY with JSON that adheres to this exact structure:
+{
+  ""title"": ""A descriptive title of the image"",
+  ""description"": ""A detailed description of the image content.""
+}";
+                    descriptionJson = await _vlmService.DescribeImageAsync(job.Uri, prompt);
+                    _logger.LogInformation("VLM response: {Response}", descriptionJson);
 
-        List<int> sortedPageNumbers = new List<int>(temporaryPages.Keys);//sort by pages
-        sortedPageNumbers.Sort();
-        foreach (int pageNumber in sortedPageNumbers)
+                    //clean up VLM response
+                    var match = Regex.Match(descriptionJson, @"\{.*\}", RegexOptions.Singleline);
+                    if (match.Success)
+                    {
+                        string cleanedJson = match.Value;
+                        var imageOut = JsonSerializer.Deserialize<ImageOutput>(cleanedJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                        return (job.PageNo, imageOut);
+                    }//if found a match with the regex, that is text between initial and last {}, eliminating unnecessary VLM content
+                    else
+                    {
+                        _logger.LogWarning("Could not find a valid JSON object for URI: {Uri} on attempt {Attempt}. Response: {Response}", job.Uri, i + 1, descriptionJson);
+                    }//if no JSON outputted, wiill log this error then retry
+
+                }
+                catch (JsonException jsonEx)
+                {
+                    _logger.LogError(jsonEx, "JSON Deserialization failed for URI: {Uri}. Raw VLM response was: {Response}", job.Uri, descriptionJson ?? "Not available");
+                    
+                }//deserialization errors
+
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "An unexpected error occurred while processing image URI: {Uri}. Raw VLM response was: {Response}", job.Uri, descriptionJson ?? "Not available");
+                    //return a failed state so the process doesn't cras
+                    break;
+                }
+            }//define number of retries in case VLM has erroneous outputs
+            _logger.LogError("All {MaxRetries} retries failed for image URI: {Uri}", maxTries, job.Uri);
+            return (job.PageNo, new ImageOutput { Title = job.Label, Description = "Error: Failed to process image after multiple attempts." });
+
+        }).ToList();
+
+        var results = await Task.WhenAll(imageTasks);
+        processedImages.AddRange(results);
+
+        _logger.LogInformation("Processed {Count} images from document.", processedImages.Count);
+        // final output dictionary to hold page number and new PageOutput object which also has ImageOutput
+        var finalOutput = new Dictionary<int, PageOutput>();
+
+        //group texts by page number
+        var textElementsByPage = new Dictionary<int, List<PageElementInfo>>();
+        foreach (var textElement in allPageElements)
         {
-            var pageTextBuilder = new StringBuilder();
-            List<PageElementInfo> pageElements = temporaryPages[pageNumber];
-
-            if (fileType == ".pptx")
+            if (textElement.PageNo.HasValue)
             {
-                pageElements.Sort((e1, e2) => e1.Top.CompareTo(e2.Top));
-            }//for pptx the way the origin is set, the bounding box "top" element is reversed, so lower elements have a higher top value
-            else
-            {
-                pageElements.Sort((e1, e2) => -e1.Top.CompareTo(e2.Top));
-            }//for pdfs: sort by top coord, uses lambda, to have page structure. - sign to reverse order, as sorts from lowest "top" to highest
-
-
-
-            foreach (var element in pageElements)
-            {
-                pageTextBuilder.AppendLine($"{element.Content}\n");
+                int pageKey = textElement.PageNo.Value;
+                if (!textElementsByPage.ContainsKey(pageKey))
+                {
+                    textElementsByPage[pageKey] = new List<PageElementInfo>();
+                }
+                textElementsByPage[pageKey].Add(textElement);
             }
-            pageContent[pageNumber] = pageTextBuilder;
-        }//go in order to aggregate content in different pages
+        }
 
-        Dictionary<int, string> finalPageContents = new Dictionary<int, string>();
-        foreach (var page in pageContent)
+        //group images by page number
+        var imagesByPage = new Dictionary<int, List<ImageOutput>>();
+        foreach (var processedImage in processedImages)
         {
-            finalPageContents[page.Key] = ContentFormatter.ConvertEscapes(page.Value.ToString());
-        }//convert StringBUilder from each page to actual string
+            int pageKey = processedImage.PageNo;
+            if (!imagesByPage.ContainsKey(pageKey))
+            {
+                imagesByPage[pageKey] = new List<ImageOutput>();
+            }
+            imagesByPage[pageKey].Add(processedImage.Output);
+        }
 
 
-        _logger.LogInformation("Finished generating");
+        // Get a unique, sorted list of all page numbers from both text and images
+        var allPageNumbersSet = new HashSet<int>();
+        foreach (var pageKey in textElementsByPage.Keys)
+        {
+            allPageNumbersSet.Add(pageKey);
+        }
+        foreach (var pageKey in imagesByPage.Keys)
+        {
+            allPageNumbersSet.Add(pageKey);
+        }
 
-        return finalPageContents;
+        //initialize list to hold sorted page numbers
+        var sortedPageNumbers = new List<int>(allPageNumbersSet);
+        sortedPageNumbers.Sort();
 
-    }//end of BuildPageContent
+        foreach (var pageNumber in sortedPageNumbers)
+        {
+            var pageOutput = new PageOutput();
+
+            if (textElementsByPage.ContainsKey(pageNumber))
+            {
+                var textElements = textElementsByPage[pageNumber];
+
+                //sort elements by their top on page
+                textElements.Sort((e1, e2) => e1.Top.CompareTo(e2.Top));
+
+                var textBuilder = new System.Text.StringBuilder();
+                for (int i = 0; i < textElements.Count; i++)
+                {
+                    textBuilder.Append(textElements[i].Content);
+                    if (i < textElements.Count - 1)
+                    {
+                        textBuilder.Append("\n");
+                    }//adds newline after each element except the last one
+                }//builds text content for the page
+                pageOutput.Text = textBuilder.ToString();
+            }//for each pageNumber, if there are text elements, build the text content
+
+            // Add image content for the current page
+            if (imagesByPage.ContainsKey(pageNumber))
+            {
+                pageOutput.Images.AddRange(imagesByPage[pageNumber]);
+            }
+
+            finalOutput[pageNumber] = pageOutput;
+
+        }//end of foreach pageNumber
+
+        _logger.LogInformation("Finished processing document content.");
+        return finalOutput;
+    }
 
     //helper to convert table data to string format
     private string ConvertTable(TableData tableData)

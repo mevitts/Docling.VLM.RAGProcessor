@@ -11,7 +11,7 @@ using TestDocling.Services;
 namespace TestDocling.Controllers
 {
     //routing 
-    [ApiController] 
+    [ApiController]
     [Route("api/docling")] //sets base URL path, so [HttpPost("convert")] turns into api/docling/convert
     public class DoclingController : ControllerBase
     {
@@ -32,15 +32,12 @@ namespace TestDocling.Controllers
         public async Task<IActionResult> ConvertFile([FromForm] FileUploadRequest request)
         {
             var file = request.File;
-           
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded");
 
             if (!FileFormatHelper.TryGetDoclingFormat(file.FileName, out string fromFormat))
-            {
                 return BadRequest($"Unsupported file format: {Path.GetExtension(file.FileName)}");
-            }
-
+            
             using var form = new MultipartFormDataContent();
             var fileContent = new StreamContent(file.OpenReadStream()); //streams uploaded file into HTTP request
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType); //sets content pdf type
@@ -55,14 +52,14 @@ namespace TestDocling.Controllers
             form.Add(new StringContent("accurate"), "table_mode");
             form.Add(new StringContent("embedded"), "image_export_mode");
             form.Add(new StringContent("true"), "include_images");
-            form.Add(new StringContent("[PAGE BREAK]"), "md_page_break_placeholder");        
+            form.Add(new StringContent("[PAGE BREAK]"), "md_page_break_placeholder");
             form.Add(new StringContent("true"), "do_picture_classification");
-            
+
             //call docling-serve
             var response = await _httpClient.PostAsync("/v1alpha/convert/file", form);
             if (!response.IsSuccessStatusCode)
                 return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
-            
+
             var jsonString = await response.Content.ReadAsStringAsync();
 
             var pageContent = await _contentProcessorService.ProcessDoclingResponse(jsonString);
