@@ -5,53 +5,40 @@ using System.Collections.Generic;
 using TestDocling;
 using System.Text;
 
-namespace TestDocling
+namespace TestDocling;
+
+public class JsonProg
 {
-    public class JsonProg
+    public static Dictionary<string, string> GetJsonContent(string json)
     {
-        public static Dictionary<string, string> GetJsonContent(string json)
+        Dictionary<string, string> fileContents = new Dictionary<string, string>();
+        try
         {
-            Dictionary<string, string> fileContents = new Dictionary<string, string>();
-            try
+            DoclingResponse doclingResponse = JsonSerializer.Deserialize<DoclingResponse>(json, new JsonSerializerOptions
             {
-                DoclingResponse doclingResponse = JsonSerializer.Deserialize<DoclingResponse>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    ReadCommentHandling = JsonCommentHandling.Skip
-                });
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
+            });
 
-                if (doclingResponse?.Document != null)
-                {
-                    fileContents.Add("filename", doclingResponse.Document.Filename);
-
-                    fileContents.Add("md_content", doclingResponse.Document.MdContent);
-                    
-                }
-                else
-                {
-                    Console.WriteLine("Did not deserialize.");
-                }
-
-                // Add page count to the dictionary if available
-                if (doclingResponse.Document.DoclingJsonContent?.Pages != null)
-                {
-                    fileContents.Add("total_pages", doclingResponse.Document.DoclingJsonContent.Pages.Count.ToString());
-                }
-                else
-                {
-                    Console.WriteLine("Pages data not found in JSON.");
-                }
-            }
-            catch (JsonException ex)
+            if (doclingResponse?.Document != null)
             {
-                Console.WriteLine($"JSON Deserialization Error: {ex.Message}");
+                fileContents.Add("filename", doclingResponse.Document.Filename);
+                fileContents.Add("md_content", doclingResponse.Document.MdContent);
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine($"An unexpected error occurred: {ex.Message}");
+                Console.WriteLine("Did not deserialize.");
             }
-
-            return fileContents;
         }
+        catch (JsonException ex) {
+            Console.WriteLine($"JSON Deserialization Error: {ex.Message}");
+            throw; // Optionally rethrow for higher-level handling
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An unexpected error occurred: {ex.Message}");
+            throw;
+        }
+        return fileContents;
     }
 }

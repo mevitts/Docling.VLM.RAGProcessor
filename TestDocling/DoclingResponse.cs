@@ -26,7 +26,6 @@ public class Document
     public JsonContent DoclingJsonContent { get; set; }
 }
 
-//main parts of json content
 public class JsonContent
 {
     [JsonPropertyName("pages")]
@@ -183,7 +182,7 @@ public class PictureItem
     public ImageRef? Image { get; set; }
 }
 
-//all for table item
+
 public class TableData
 {
     [JsonPropertyName("bbox")]
@@ -265,7 +264,7 @@ public class GridItem
     [JsonPropertyName("row_section")]
     public bool? RowSection { get; set; }
 }
-//prov
+
 public class BoundingBox
 {
     [JsonPropertyName("l")]
@@ -280,14 +279,13 @@ public class BoundingBox
     public string? CoordOrigin { get; set; }
 }
 
-//$ref
+
 public class DoclingRef
 {
     [JsonPropertyName("$ref")]
     public string? Ref { get; set; }
 }
 
-//page no and image
 public class PageDetail
 {
     [JsonPropertyName("page_no")]
@@ -296,8 +294,6 @@ public class PageDetail
     [JsonPropertyName("image")]
     public ImageRef? Image { get; set; }
 }
-
-//img uri
 public class ImageRef
 {
     [JsonPropertyName("uri")]

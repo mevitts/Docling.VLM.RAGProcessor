@@ -1,4 +1,6 @@
 ﻿namespace TestDocling.Services;
+
+using TestDocling.Models;
 using static TestDocling.Services.DoclingContentProcessorService;
 
 public interface IDoclingContentProcessorService
