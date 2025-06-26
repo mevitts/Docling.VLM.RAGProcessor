@@ -1,6 +1,8 @@
-﻿namespace TestDocling.Services;
+﻿using TestDocling.Models;
+
+namespace TestDocling.Services;
 
 public interface IVlmService
 {
-    Task<string> DescribeImageAsync(string uri, string prompt);
+    Task<ImageOutput> DescribeImageAsync(string uri, string prompt, int pageNo);
 }

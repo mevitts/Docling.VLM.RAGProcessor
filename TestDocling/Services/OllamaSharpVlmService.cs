@@ -5,6 +5,8 @@ using OllamaSharp.Models.Chat;
 using System;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
+using System.Text.Json;
+using TestDocling.Models;
 using static System.Net.WebRequestMethods;
 
 namespace TestDocling.Services;
@@ -22,7 +24,7 @@ public class OllamaSharpVlmService : IVlmService
         _logger = logger;
 
     }
-    public async Task<string> DescribeImageAsync(string uri, string prompt)
+    public async Task<ImageOutput> DescribeImageAsync(string uri, string prompt, int pageNo)
     {
         var chat = new Chat(_ollamaApiClient);
 
@@ -39,12 +41,13 @@ public class OllamaSharpVlmService : IVlmService
                 responseBuilder.Append(responsePart);
             }
 
-            return responseBuilder.ToString();
+            var imageOutput = JsonSerializer.Deserialize<ImageOutput>(responseBuilder.ToString());
+            return imageOutput;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error describing image with Ollama API: {Message}", ex.Message);
-            return $"Error: {ex.Message}";
+            throw;
         }
     }
 }

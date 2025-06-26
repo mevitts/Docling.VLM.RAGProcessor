@@ -193,44 +193,26 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
             const int maxTries = 3;
             for (int i = 0; i < maxTries; i++)
             {
-                string descriptionJson = "";
                 try
                 {
-                    string prompt = @"You are an automated image analysis tool. Your SOLE function is to return a single, valid JSON object.
-                                    Do NOT include any explanatory text, apologies, or any characters before or after the JSON object.
-                                    Do NOT use markdown code blocks like ```json.
+                    string prompt = @"Analyze the provided image and generate a JSON object containing a 'title' and a 'description'. Both should be clear and concise, and limit the description to AT MOST 2 sentences.";
 
-                                    Respond ONLY with JSON that adheres to this exact structure:
-                                    {
-                                      ""title"": ""A descriptive title of the image"",
-                                      ""description"": ""A detailed description of the image content.""
-                                    }";
-                    descriptionJson = await _vlmService.DescribeImageAsync(job.Uri, prompt);
+                    var imageOutput = await _vlmService.DescribeImageAsync(job.Uri, prompt, job.PageNo);
 
-                    //extract the JSON object from the response in case of extra content
-                    var match = Regex.Match(descriptionJson, @"\{.*\}", RegexOptions.Singleline);
-                    if (match.Success)
-                    {
-                        string cleanedJson = match.Value;
-                        var imageOut = JsonSerializer.Deserialize<ImageOutput>(cleanedJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                        return (job.PageNo, imageOut);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Could not find a valid JSON object for URI: {Uri} on attempt {Attempt}. Response: {Response}", job.Uri, i + 1, descriptionJson);
-                    }
-                }
-                catch (JsonException jsonEx)
-                {
-                    _logger.LogError(jsonEx, "JSON Deserialization failed for URI: {Uri}. Raw VLM response was: {Response}", job.Uri, descriptionJson ?? "Not available");
+                    return (job.PageNo, imageOutput);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An unexpected error occurred while processing image URI: {Uri}. Raw VLM response was: {Response}", job.Uri, descriptionJson ?? "Not available");
-                    break;
+                    _logger.LogWarning(ex, "Failed to process image URI: {Uri} on attempt {Attempt}/{MaxTries}", job.Uri, i + 1, maxTries);
+
+                    if (i < maxTries - 1)
+                    {
+                        //wait to prevent spamming API
+                        await Task.Delay(2000);
+                    }
                 }
             }
+            _logger.LogError("All {MaxTries} retries failed for image URI: {Uri}", maxTries, job.Uri);
             return (job.PageNo, new ImageOutput { Title = job.Label, Description = "Error: Failed to process image after multiple attempts." });
         }).ToList();
 

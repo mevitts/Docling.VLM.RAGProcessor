@@ -1,11 +1,19 @@
-﻿using TestDocling.Services;
+﻿using OpenAI.Chat;
+using OpenAI;
+using TestDocling.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
+if (string.IsNullOrEmpty(openAiApiKey))
+{
+    throw new InvalidOperationException("OpenAI API key is not configured.");
+}
+
 builder.Services.AddDoclingServices();
-builder.Services.AddOllamaServices();
 builder.Services.AddScoped<IDoclingContentProcessorService, DoclingContentProcessorService>();
-builder.Services.AddScoped<IVlmService, OllamaSharpVlmService>(); 
+builder.Services.AddScoped<IVlmService, OpenAiVlmService>();
+builder.Services.AddSingleton(new ChatClient(model: "gpt-4o", apiKey: openAiApiKey));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
