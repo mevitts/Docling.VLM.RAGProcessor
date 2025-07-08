@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromMinutes(5);
             client.BaseAddress = new Uri(doclingURL);
         });
-        services.AddScoped<IDoclingContentProcessorService, DoclingContentProcessorService>();
+        services.AddScoped<IDoclingService, DoclingService>();
         return services;
     }
 

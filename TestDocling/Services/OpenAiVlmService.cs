@@ -29,6 +29,18 @@ public class OpenAiVlmService : IVlmService
             throw new ArgumentNullException(nameof(imageUri));
         }
 
+        //extract raw image data and convert to bytes to feed, avoids errors thrown from URI length being too long.
+        var parts = imageUri.Split(',');
+        if (parts.Length != 2)
+        {
+            throw new ArgumentException("Invalid Data URI format.", nameof(imageUri));
+        }
+        string mimeType = parts[0].Split(';')[0].Split(':')[1];
+
+        var imageBytes = Convert.FromBase64String(parts[1]);
+        var binaryImageData = BinaryData.FromBytes(imageBytes);
+
+
         string pageNoString = pageNo.ToString();
         var imageOutputSchema = BinaryData.FromString("""
             {
@@ -47,7 +59,7 @@ public class OpenAiVlmService : IVlmService
             new UserChatMessage(new List<ChatMessageContentPart>
             {
                 ChatMessageContentPart.CreateTextPart(prompt),
-                ChatMessageContentPart.CreateImagePart(new Uri(imageUri)),
+                ChatMessageContentPart.CreateImagePart(binaryImageData, mimeType),
             })
         ];
 
@@ -70,6 +82,8 @@ public class OpenAiVlmService : IVlmService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "OpenAI API call failed for page {PageNo}. Error: {ErrorMessage}", pageNo, ex.Message);
+
             throw;
         }
     }

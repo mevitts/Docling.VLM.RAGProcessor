@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using TestDocling;
 using System.Text;
+using TestDocling.Models;
 
 namespace TestDocling;
 
@@ -14,7 +15,7 @@ public class JsonProg
         Dictionary<string, string> fileContents = new Dictionary<string, string>();
         try
         {
-            DoclingResponse doclingResponse = JsonSerializer.Deserialize<DoclingResponse>(json, new JsonSerializerOptions
+            TaskResultResponse doclingResponse = JsonSerializer.Deserialize<TaskResultResponse>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 ReadCommentHandling = JsonCommentHandling.Skip

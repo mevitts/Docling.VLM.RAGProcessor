@@ -4,14 +4,25 @@ using System.Collections.Generic;
 using System.Reflection.Metadata;
 using System.Text.Json.Serialization;
 
-namespace TestDocling;
-public class DoclingResponse
+namespace TestDocling.Models;
+public record TaskStatusResponse(
+    [property: JsonPropertyName("task_id")] string TaskId,
+    [property: JsonPropertyName("task_status")] string TaskStatus,
+    [property: JsonPropertyName("task_position")] int? TaskPosition
+);
+public class TaskResultResponse
 {
     [JsonPropertyName("document")]
     public Document Document { get; set; }
 
+    [JsonPropertyName("status")]
+    public string Status { get; set; }
+
+    [JsonPropertyName("errors")]
+    public List<string> Errors { get; set; }
+
     [JsonPropertyName("processing_time")]
-    public double process_time { get; set; }
+    public double ProcessingTime { get; set; }
 }
 
 public class Document

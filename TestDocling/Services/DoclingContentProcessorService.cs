@@ -14,7 +14,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using TestDocling;
 using TestDocling.Helpers;
 using TestDocling.Models;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -44,21 +43,26 @@ public class DoclingContentProcessorService : IDoclingContentProcessorService
         public string Uri { get; set; }
         public string Label { get; set; }
     }
-    public async Task<Dictionary<int, PageOutput>> ProcessDoclingResponse(string doclingJsonOutput)
+    private byte[] GetBytesFromDataUri(string dataUri)
+    {
+        var content = dataUri.Split(',')[1];
+        return Convert.FromBase64String(content);
+    }
+    public async Task<Dictionary<int, PageOutput>> ProcessDoclingResponse(Document doclingResponse)
     {
         try
         {
-            var doclingResponse = JsonSerializer.Deserialize<DoclingResponse>(doclingJsonOutput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return await BuildPageContent(doclingResponse.Document);
+            //var doclingResponse = JsonSerializer.Deserialize<TaskResultResponse>(doclingJsonOutput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return await BuildPageContent(doclingResponse);
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "JSON Deserialization failed for Docling response. Raw response was: {Response}", doclingJsonOutput ?? "Not available");
+            //_logger.LogError(ex, "JSON Deserialization failed for Docling response. Raw response was: {Response}", doclingResponse.ToString ?? "Not available");
             throw new InvalidOperationException("Failed to process Docling response due to JSON deserialization error.", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unexpected error occurred while processing Docling response. Raw response was: {Response}", doclingJsonOutput ?? "Not available");
+            //_logger.LogError(ex, "An unexpected error occurred while processing Docling response. Raw response was: {Response}", doclingJsonOutput ?? "Not available");
             throw new InvalidOperationException("Failed to process Docling response due to an unexpected error.", ex);
         }
     }
