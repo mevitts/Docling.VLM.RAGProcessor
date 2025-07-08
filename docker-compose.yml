@@ -6,19 +6,10 @@ services:
       dockerfile: TestDocling/Dockerfile
     ports:
     - "5000:80"
-    depends_on:
-    - docling
-   # - ollama
     environment:
-    - DOCLING_URL=http://docling:5001
+    - DOCLING_URL=http://10.0.0.135:5001
     - OLLAMA_URL=http://host.docker.internal:11434
 
-  docling:
-    image: quay.io/docling-project/docling-serve
-    ports:
-    - "5001:5001"
-    environment:
-      - DOCLING_SERVE_MAX_SYNC_WAIT=3000
 
     
     
